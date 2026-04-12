@@ -300,20 +300,29 @@ router.post('/upload-csv', (req, res, next) => {
     if (err) return res.status(400).json({ error: err.message });
     next();
   });
-}, (req, res) => {
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded. Make sure the field name is "file".' });
 
-    const XLSX = require('xlsx');
+    const ExcelJS = require('exceljs');
     const { parse } = require('csv-parse/sync');
     const filename = (req.file.originalname || '').toLowerCase();
     let rows = [];
 
     if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) {
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(req.file.buffer);
+      const sheet = workbook.worksheets[0];
+      const headers = [];
+      sheet.getRow(1).eachCell((cell) => headers.push(String(cell.value || '')));
+      sheet.eachRow((row, rowNum) => {
+        if (rowNum === 1) return;
+        const obj = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+          obj[headers[colNum - 1]] = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+        });
+        if (Object.values(obj).some(v => v)) rows.push(obj);
+      });
     } else {
       // Default: treat as CSV
       const content = req.file.buffer.toString('utf8');
@@ -335,21 +344,31 @@ router.post('/import-contacts', (req, res, next) => {
     if (err) return res.status(400).json({ error: err.message });
     next();
   });
-}, (req, res) => {
+}, async (req, res) => {
   try {
     const { nameCol, phoneCol, messageCol, defaultMessage } = req.body;
     if (!nameCol || !phoneCol) return res.status(400).json({ error: 'Name and phone columns are required' });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const XLSX = require('xlsx');
+    const ExcelJS = require('exceljs');
     const { parse } = require('csv-parse/sync');
     const filename = (req.file.originalname || '').toLowerCase();
     let rows = [];
 
     if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) {
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(req.file.buffer);
+      const sheet = workbook.worksheets[0];
+      const headers = [];
+      sheet.getRow(1).eachCell((cell) => headers.push(String(cell.value || '')));
+      sheet.eachRow((row, rowNum) => {
+        if (rowNum === 1) return;
+        const obj = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+          obj[headers[colNum - 1]] = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+        });
+        if (Object.values(obj).some(v => v)) rows.push(obj);
+      });
     } else {
       const content = req.file.buffer.toString('utf8');
       rows = parse(content, { columns: true, skip_empty_lines: true, trim: true });
