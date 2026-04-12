@@ -19,7 +19,12 @@ app.use(cors({
   origin: (origin, cb) => {
     // Allow requests with no origin (mobile apps, curl, Render health checks)
     if (!origin) return cb(null, true);
-    if (allowedOrigins.some(o => origin.startsWith(o))) return cb(null, true);
+    // Allow all vercel.app subdomains + configured origins
+    if (
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.onrender.com') ||
+      allowedOrigins.some(o => origin === o)
+    ) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
