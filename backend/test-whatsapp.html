@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp QR Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; font-size: 16px; }
+        #status { padding: 10px; background: #f0f0f0; margin: 10px 0; border-radius: 5px; }
+        #qr { margin: 20px 0; }
+        #qr img { border: 4px solid #075e54; border-radius: 8px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>WhatsApp QR Code Test</h1>
+    
+    <div>
+        <button onclick="login()">1. Login</button>
+        <button onclick="checkStatus()">2. Check Status</button>
+        <button onclick="initWhatsApp()">3. Initialize WhatsApp</button>
+        <button onclick="logout()">4. Logout WhatsApp</button>
+    </div>
+    
+    <div id="status"></div>
+    <div id="qr"></div>
+    
+    <script>
+        let token = '';
+        
+        async function login() {
+            try {
+                const res = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                const data = await res.json();
+                token = data.token;
+                document.getElementById('status').innerHTML = '<span class="success">✅ Logged in! Token: ' + token.substring(0, 20) + '...</span>';
+            } catch (err) {
+                document.getElementById('status').innerHTML = '<span class="error">❌ Login failed: ' + err.message + '</span>';
+            }
+        }
+        
+        async function checkStatus() {
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+            try {
+                const res = await fetch('http://localhost:3000/api/whatsapp/status', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                let html = '<strong>Status:</strong> ' + data.status;
+                if (data.qr) {
+                    html += '<br><strong>QR Code:</strong> Available';
+                    document.getElementById('qr').innerHTML = '<img src="' + data.qr + '" alt="QR Code" />';
+                } else {
+                    html += '<br><strong>QR Code:</strong> Not available';
+                    document.getElementById('qr').innerHTML = '';
+                }
+                document.getElementById('status').innerHTML = html;
+            } catch (err) {
+                document.getElementById('status').innerHTML = '<span class="error">❌ Status check failed: ' + err.message + '</span>';
+            }
+        }
+        
+        async function initWhatsApp() {
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+            try {
+                const res = await fetch('http://localhost:3000/api/whatsapp/init', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                document.getElementById('status').innerHTML = '<span class="success">✅ ' + data.message + '</span>';
+                
+                // Poll for QR code
+                setTimeout(() => {
+                    const interval = setInterval(async () => {
+                        await checkStatus();
+                        const statusText = document.getElementById('status').textContent;
+                        if (statusText.includes('ready') || statusText.includes('authenticated')) {
+                            clearInterval(interval);
+                        }
+                    }, 2000);
+                }, 2000);
+            } catch (err) {
+                document.getElementById('status').innerHTML = '<span class="error">❌ Init failed: ' + err.message + '</span>';
+            }
+        }
+        
+        async function logout() {
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+            try {
+                const res = await fetch('http://localhost:3000/api/whatsapp/logout', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                document.getElementById('status').innerHTML = '<span class="success">✅ ' + data.message + '</span>';
+                document.getElementById('qr').innerHTML = '';
+            } catch (err) {
+                document.getElementById('status').innerHTML = '<span class="error">❌ Logout failed: ' + err.message + '</span>';
+            }
+        }
+    </script>
+</body>
+</html>
