@@ -2,6 +2,7 @@
 [phases.setup]
 aptPkgs = [
   "chromium",
+  "procps",
   "libnss3",
   "libatk-1.0-0",
   "libatk-bridge2.0-0",
