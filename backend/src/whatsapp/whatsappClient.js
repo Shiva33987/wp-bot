@@ -11,7 +11,7 @@ function getClient() { return client; }
 function getStatus() { return clientStatus; }
 function getQR() { return currentQR; }
 
-function initWhatsApp() {
+async function initWhatsApp() {
   if (client) {
     console.log('[WhatsApp] Client already initialized');
     return;
@@ -29,11 +29,7 @@ function initWhatsApp() {
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
           '--no-zygote',
-          '--disable-gpu',
-          '--single-process',
         ],
       },
     });
@@ -161,13 +157,15 @@ function initWhatsApp() {
   });
 
   try {
-    client.initialize();
     console.log('[WhatsApp] Initializing client...');
+    await client.initialize();
   } catch (err) {
     console.error('[WhatsApp] Initialization failed:', err.message);
     clientStatus = 'disconnected';
+    if (client) {
+      try { await client.destroy(); } catch { /* ignore */ }
+    }
     client = null;
-    throw err;
   }
 }
 

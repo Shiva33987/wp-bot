@@ -1,1 +1,11 @@
-node_modules
+node_modules/
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/
+backend/.env
+frontend/.env.development
+frontend/.env.local
+frontend/.env.*.local
+dist/
+build/
+.vscode/
+.DS_Store

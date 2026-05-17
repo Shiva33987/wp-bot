@@ -36,10 +36,7 @@ function deleteContact(phone) {
     throw new Error('Contact not found');
   }
   
-  // Write back to CSV
-  const header = 'name,phone,message\n';
-  const rows = filtered.map(c => `${c.name},${c.phone},${c.message}`).join('\n');
-  fs.writeFileSync(CONTACTS_FILE, header + rows + '\n');
+  saveContacts(filtered);
   
   console.log(`[CSV] Deleted contact: ${phone}`);
   return { success: true, deleted: contacts.length - filtered.length };
@@ -52,8 +49,7 @@ function deleteAllContacts() {
   const contacts = readContacts();
   const count = contacts.length;
   
-  // Write only header
-  fs.writeFileSync(CONTACTS_FILE, 'name,phone,message\n');
+  saveContacts([]);
   
   console.log(`[CSV] Deleted all ${count} contacts`);
   return { success: true, deleted: count };
@@ -65,31 +61,23 @@ function deleteAllContacts() {
  */
 async function logMessage({ direction, from, to, name = '', message, status = 'ok' }) {
   ensureLogFile();
+  
+  const escape = (v) => {
+    const s = String(v || '');
+    return `"${s.replace(/"/g, '""')}"`;
+  };
 
-  const writer = createObjectCsvWriter({
-    path: LOG_FILE,
-    header: [
-      { id: 'timestamp', title: 'timestamp' },
-      { id: 'direction', title: 'direction' },
-      { id: 'from', title: 'from' },
-      { id: 'to', title: 'to' },
-      { id: 'name', title: 'name' },
-      { id: 'message', title: 'message' },
-      { id: 'status', title: 'status' },
-    ],
-    append: true,
-  });
-
-  await writer.writeRecords([{
-    timestamp: new Date().toISOString(),
+  const row = [
+    new Date().toISOString(),
     direction,
     from,
     to,
-    name,
-    message,
-    status,
-  }]);
+    escape(name),
+    escape(message),
+    status
+  ].join(',') + '\n';
 
+  fs.appendFileSync(LOG_FILE, row);
   console.log(`[CSV] Logged ${direction} message | ${from} → ${to}`);
 }
 
@@ -99,8 +87,12 @@ async function logMessage({ direction, from, to, name = '', message, status = 'o
 function readLog() {
   ensureLogFile();
   const content = fs.readFileSync(LOG_FILE, 'utf8');
-  if (content.trim() === 'timestamp,direction,from,to,name,message,status') return [];
-  return parse(content, { columns: true, skip_empty_lines: true, trim: true });
+  try {
+    return parse(content, { columns: true, skip_empty_lines: true, trim: true });
+  } catch (err) {
+    console.error('[CSV] Failed to parse log:', err.message);
+    return [];
+  }
 }
 
 /**
@@ -185,11 +177,14 @@ function cleanLog() {
 function saveContacts(contacts) {
   const header = 'name,phone,message\n';
   const rows = contacts.map(c => {
-    // Escape commas in fields
-    const escape = (v) => (String(v).includes(',') ? `"${v}"` : String(v));
-    return `${escape(c.name)},${escape(c.phone)},${escape(c.message || '')}`;
+    // Robust CSV escaping: wrap in quotes, escape existing quotes by doubling them
+    const escape = (v) => {
+      const s = String(v || '');
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    return `${escape(c.name)},${escape(c.phone)},${escape(c.message)}`;
   }).join('\n');
-  fs.writeFileSync(CONTACTS_FILE, header + rows + '\n');
+  fs.writeFileSync(CONTACTS_FILE, header + rows + (rows ? '\n' : ''));
   console.log(`[CSV] Saved ${contacts.length} contacts`);
 }
 

@@ -314,12 +314,20 @@ router.post('/upload-csv', (req, res, next) => {
       await workbook.xlsx.load(req.file.buffer);
       const sheet = workbook.worksheets[0];
       const headers = [];
-      sheet.getRow(1).eachCell((cell) => headers.push(String(cell.value || '')));
+      
+      const headerRow = sheet.getRow(1);
+      headerRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+        headers[colNum - 1] = String(cell.value || '');
+      });
+
       sheet.eachRow((row, rowNum) => {
         if (rowNum === 1) return;
         const obj = {};
         row.eachCell({ includeEmpty: true }, (cell, colNum) => {
-          obj[headers[colNum - 1]] = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+          const header = headers[colNum - 1];
+          if (header) {
+            obj[header] = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+          }
         });
         if (Object.values(obj).some(v => v)) rows.push(obj);
       });
@@ -360,12 +368,20 @@ router.post('/import-contacts', (req, res, next) => {
       await workbook.xlsx.load(req.file.buffer);
       const sheet = workbook.worksheets[0];
       const headers = [];
-      sheet.getRow(1).eachCell((cell) => headers.push(String(cell.value || '')));
+      
+      const headerRow = sheet.getRow(1);
+      headerRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+        headers[colNum - 1] = String(cell.value || '');
+      });
+
       sheet.eachRow((row, rowNum) => {
         if (rowNum === 1) return;
         const obj = {};
         row.eachCell({ includeEmpty: true }, (cell, colNum) => {
-          obj[headers[colNum - 1]] = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+          const header = headers[colNum - 1];
+          if (header) {
+            obj[header] = cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+          }
         });
         if (Object.values(obj).some(v => v)) rows.push(obj);
       });
@@ -409,7 +425,10 @@ router.post('/import-sheets', async (req, res) => {
       const client = url.startsWith('https') ? https : http;
       client.get(url, (resp) => {
         if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
-          return fetchUrl(resp.headers.location).then(resolve).catch(reject);
+          return fetchUrl(new URL(resp.headers.location, url).href).then(resolve).catch(reject);
+        }
+        if (resp.statusCode !== 200) {
+          return reject(new Error('Failed to fetch: HTTP ' + resp.statusCode));
         }
         let data = '';
         resp.on('data', chunk => data += chunk);
@@ -456,7 +475,10 @@ router.post('/preview-sheets', async (req, res) => {
       const client = url.startsWith('https') ? https : http;
       client.get(url, (resp) => {
         if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
-          return fetchUrl(resp.headers.location).then(resolve).catch(reject);
+          return fetchUrl(new URL(resp.headers.location, url).href).then(resolve).catch(reject);
+        }
+        if (resp.statusCode !== 200) {
+          return reject(new Error('Failed to fetch: HTTP ' + resp.statusCode));
         }
         let data = '';
         resp.on('data', chunk => data += chunk);
